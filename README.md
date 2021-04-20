@@ -39,3 +39,49 @@ With role bindings created is time to create users. User creation is divided in 
 All these steps are summarized in the user creation script create-user.sh.  
 To create the users execute it providing all input params (path to Cluster CA cert is optional, but it is going to create the file if you dont provide it), if dont, it is going to fail. 
 
+## Postgres issues
+
+Using postgres as backend database we face the problem of database data persistence. If you want to share a volume with database pod/s to store data (/var/lib/postgresql/data by default and its contents) and try with azureFile resources you will find:  
+
+- Permission problems: you cannot mount the volume using same path as pod data folder.  
+- Data persistence problems: Once you have solved the above you'll find that only the folder is mapped into the shared volume, but not its contents. If you kill the pod, all data of db is lost. We also tried to upload a file directly to the shared volume and check its existance through pod filesystem (and vice versa) and it was not accessible.  
+
+We finally solve this creating a custom storageClass to use azure standard hdd's instead of ssd's (which have created by default storage classes in AKS) and pointing as storage directory in postgres via PGDATA env variable a folder out of /var/lib/postgresql/data path.  
+This finally resolves the issue and data is still there when you kill the pod.  
+
+```
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: azuredisk-custom-storageclass
+provisioner: kubernetes.io/azure-disk
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  storageaccounttype: Standard_LRS
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "azuredisk-custom-storageclass"
+  resources:
+    requests:
+      storage: 1Gi
+---
+    - name: PGDATA
+              value: /var/lib/postgresql/backup
+ 
+        volumeMounts:
+          - name: database
+            mountPath: /var/lib/postgresql
+            subPath: backup
+      
+      volumes:
+        - name: database
+          persistentVolumeClaim:
+            claimName: database-pvc
+```

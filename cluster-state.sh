@@ -5,7 +5,7 @@ started="running"
 stopped="deallocated"
 
 #Current state of cluster
-state=`az vmss show --resource-group MC_ciber-development-cloud_cloud-audit-cluster_francecentral --name aks-nodepool1-33573588-vmss --instance-id 0 --query instanceView.statuses[1].code | sed 's/.*\///; s/"//'`
+state=`az vmss show --resource-group XXXXXXXXX --name XXXXXXX --instance-id 0 --query instanceView.statuses[1].code | sed 's/.*\///; s/"//'`
 
 #Starting VMS
 echo "Checking cluster state ...."
